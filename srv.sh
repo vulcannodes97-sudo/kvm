@@ -22,21 +22,17 @@ php artisan tinker --execute="DB::table('users')->update(['root_admin' => 1]);"
 echo "Done."
 echo ""
 
-echo "Fetching users..."
+echo "Fetching users from database..."
 
-USER_LIST=$(php artisan tinker --execute="DB::table('users')->pluck('id');")
-
-echo "$USER_LIST" | grep -o '[0-9]\+' | while read USER_ID
+mysql -u root -D panel -e "SELECT id,username FROM users;" -s -N | while read USER_ID USERNAME
 do
-
-USERNAME=$(php artisan tinker --execute="echo DB::table('users')->where('id',$USER_ID)->value('username');")
 
 echo "User: $USERNAME (ID:$USER_ID)"
 
 for i in {1..10}
 do
 
-ALLOC_ID=$(php artisan tinker --execute="echo DB::table('allocations')->whereNull('server_id')->value('id');")
+ALLOC_ID=$(mysql -u root -D panel -e "SELECT id FROM allocations WHERE server_id IS NULL LIMIT 1;" -s -N)
 
 if [ -z "$ALLOC_ID" ]; then
 echo "No free allocations left!"
@@ -58,7 +54,7 @@ echo "Server $i created (allocation $ALLOC_ID)"
 
 done
 
-echo "-----------------------------"
+echo "-------------------------"
 
 done
 

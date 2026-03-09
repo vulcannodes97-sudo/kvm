@@ -1,37 +1,57 @@
 #!/bin/bash
 
-echo "===== Pterodactyl API Auto Manager ====="
+echo "===== Pterodactyl Auto Manager ====="
 
 read -p "Enter Panel URL: " PANEL_URL
 read -p "Enter Application API Key: " API_KEY
 
 echo ""
-echo "Testing API connection..."
+echo "Installing jq if needed..."
+apt install jq -y >/dev/null 2>&1
 
-API_TEST=$(curl -s -L "$PANEL_URL/api/application/users" \
+echo ""
+echo "Detecting node..."
+
+NODE_ID=$(curl -s -L "$PANEL_URL/api/application/nodes" \
+-H "Authorization: Bearer $API_KEY" \
+-H "Accept: Application/vnd.pterodactyl.v1+json" | jq -r '.data[0].attributes.id')
+
+echo "Node detected: $NODE_ID"
+
+echo ""
+echo "Detecting egg..."
+
+EGG_ID=$(curl -s -L "$PANEL_URL/api/application/nests" \
+-H "Authorization: Bearer $API_KEY" \
+-H "Accept: Application/vnd.pterodactyl.v1+json" | jq -r '.data[0].attributes.relationships.eggs.data[0].attributes.id')
+
+echo "Egg detected: $EGG_ID"
+
+PAGE=1
+
+while true
+do
+
+RESPONSE=$(curl -s -L "$PANEL_URL/api/application/users?page=$PAGE" \
 -H "Authorization: Bearer $API_KEY" \
 -H "Accept: Application/vnd.pterodactyl.v1+json")
 
-if echo "$API_TEST" | grep -q "errors"; then
-echo "API ERROR:"
-echo "$API_TEST"
-exit 1
+COUNT=$(echo "$RESPONSE" | jq '.data | length')
+
+if [ "$COUNT" = "0" ] || [ "$COUNT" = "null" ]; then
+break
 fi
 
-echo "API connection successful."
 echo ""
+echo "Processing users page $PAGE..."
 
-echo "Fetching users..."
-
-echo "$API_TEST" | jq -c '.data[]' | while read user
+echo "$RESPONSE" | jq -c '.data[]' | while read user
 do
 
 USER_ID=$(echo "$user" | jq -r '.attributes.id')
 USERNAME=$(echo "$user" | jq -r '.attributes.username')
-EMAIL=$(echo "$user" | jq -r '.attributes.email')
 
-echo ""
-echo "User: $USERNAME ($EMAIL)"
+echo "User: $USERNAME (ID:$USER_ID)"
 
 echo "Setting admin..."
 
@@ -46,6 +66,15 @@ echo "Admin enabled"
 for i in {1..10}
 do
 
+ALLOC_ID=$(curl -s -L "$PANEL_URL/api/application/nodes/$NODE_ID/allocations" \
+-H "Authorization: Bearer $API_KEY" \
+-H "Accept: Application/vnd.pterodactyl.v1+json" | jq -r '.data[] | select(.attributes.assigned==false) | .attributes.id' | head -n 1)
+
+if [ -z "$ALLOC_ID" ]; then
+echo "No free allocation!"
+break
+fi
+
 echo "Creating server $i..."
 
 curl -s -L -X POST "$PANEL_URL/api/application/servers" \
@@ -55,7 +84,7 @@ curl -s -L -X POST "$PANEL_URL/api/application/servers" \
 -d "{
 \"name\": \"auto-$USERNAME-$i\",
 \"user\": $USER_ID,
-\"egg\": 1,
+\"egg\": $EGG_ID,
 \"docker_image\": \"ghcr.io/pterodactyl/yolks:nodejs_18\",
 \"startup\": \"npm start\",
 \"environment\": {},
@@ -72,7 +101,7 @@ curl -s -L -X POST "$PANEL_URL/api/application/servers" \
 \"backups\": 0
 },
 \"allocation\": {
-\"default\": 1
+\"default\": $ALLOC_ID
 }
 }" >/dev/null
 
@@ -80,7 +109,11 @@ echo "Server $i created"
 
 done
 
-echo "--------------------------"
+echo "---------------------------"
+
+done
+
+PAGE=$((PAGE+1))
 
 done
 

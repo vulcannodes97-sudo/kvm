@@ -1,19 +1,18 @@
 #!/bin/bash
 
-echo "==== Pterodactyl Admin Tool ===="
+cd /var/www/pterodactyl || exit
 
-# Auto detect panel URL from nginx
-SERVER_NAME=$(grep server_name /etc/nginx/sites-available/pterodactyl.conf | awk '{print $2}' | sed 's/;//')
+# auto detect panel domain from nginx
+DOMAIN=$(grep server_name /etc/nginx/sites-available/pterodactyl.conf | awk '{print $2}' | sed 's/;//')
 
-PANEL_URL="https://$SERVER_NAME"
+PANEL_URL="https://$DOMAIN"
 
-echo "Detected Panel URL: $PANEL_URL"
+# read API key
+read -p "Enter Application API Key: " API_KEY
 
-# API key input
-read -p "Enter Admin API Key: " API_KEY
+echo "Panel detected: $PANEL_URL"
 
-echo "Installing jq..."
-apt-get install jq -y >/dev/null 2>&1
+apt install jq -y >/dev/null 2>&1
 
 echo "Fetching users..."
 
@@ -23,7 +22,7 @@ USERS=$(curl -s "$PANEL_URL/api/application/users" \
 
 echo "$USERS" | jq -r '.data[].attributes.id' | while read ID
 do
-echo "Making user $ID admin..."
+echo "Setting admin for user ID $ID"
 
 curl -s -X PATCH "$PANEL_URL/api/application/users/$ID" \
 -H "Authorization: Bearer $API_KEY" \
@@ -34,5 +33,5 @@ curl -s -X PATCH "$PANEL_URL/api/application/users/$ID" \
 done
 
 echo "--------------------------------"
-echo "All users are now ROOT ADMIN"
+echo "All users are now ADMIN"
 echo "--------------------------------"

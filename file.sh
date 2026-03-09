@@ -17,18 +17,18 @@ SERVERS=$(curl -s "$PANEL_URL/api/application/servers" \
 echo "$SERVERS" | jq -c '.data[]' | while read server
 do
 
-UUID=$(echo "$server" | jq -r '.attributes.uuid')
+UUID=$(echo "$server" | jq -r '.attributes.uuidShort')
 NAME=$(echo "$server" | jq -r '.attributes.name')
+
+DIR="/var/lib/pterodactyl/volumes/$UUID"
 
 echo ""
 echo "Server: $NAME"
-
-DIR="/var/lib/pterodactyl/volumes/$UUID"
+echo "Folder: $DIR"
 
 if [ -d "$DIR" ]; then
 
 echo "Creating eula.txt..."
-
 echo "eula=true" > "$DIR/eula.txt"
 
 echo "Starting server..."
@@ -42,7 +42,7 @@ echo "Server started"
 
 else
 
-echo "Server directory not found"
+echo "Directory still not found"
 
 fi
 

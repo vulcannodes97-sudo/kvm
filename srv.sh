@@ -36,7 +36,7 @@ USERNAME=$(php artisan tinker --execute="echo DB::table('users')->where('id',$US
 echo ""
 echo "User: $USERNAME (ID:$USER_ID)"
 
-for i in {1..10}
+for i in {1..100}
 do
 
 php artisan p:server:create \

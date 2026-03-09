@@ -1,56 +1,69 @@
 #!/bin/bash
 
-echo "===== Pterodactyl Auto Manager ====="
+echo "===== Pterodactyl API Manager ====="
 
-cd /var/www/pterodactyl || exit
-
-echo "Detecting configuration..."
-
-NODE_ID=$(php artisan tinker --execute="echo DB::table('nodes')->value('id');")
-EGG_ID=$(php artisan tinker --execute="echo DB::table('eggs')->value('id');")
-NEST_ID=$(php artisan tinker --execute="echo DB::table('nests')->value('id');")
-
-echo "Node: $NODE_ID"
-echo "Nest: $NEST_ID"
-echo "Egg: $EGG_ID"
+read -p "Enter Panel URL: " PANEL_URL
+read -p "Enter Application API Key: " API_KEY
 
 echo ""
-echo "Setting all users → admin..."
+echo "Fetching users..."
 
-php artisan tinker --execute="DB::table('users')->update(['root_admin' => 1]);"
+USERS=$(curl -s -L "$PANEL_URL/api/application/users" \
+-H "Authorization: Bearer $API_KEY" \
+-H "Accept: Application/vnd.pterodactyl.v1+json")
 
-echo "Done."
-echo ""
-
-echo "Fetching users from database..."
-
-mysql -u root -D panel -e "SELECT id,username FROM users;" -s -N | while read USER_ID USERNAME
+echo "$USERS" | jq -c '.data[]' | while read user
 do
 
-echo "User: $USERNAME (ID:$USER_ID)"
+USER_ID=$(echo "$user" | jq -r '.attributes.id')
+USERNAME=$(echo "$user" | jq -r '.attributes.username')
+EMAIL=$(echo "$user" | jq -r '.attributes.email')
+
+echo ""
+echo "User: $USERNAME ($EMAIL)"
+
+echo "Setting admin..."
+
+curl -s -L -X PATCH "$PANEL_URL/api/application/users/$USER_ID" \
+-H "Authorization: Bearer $API_KEY" \
+-H "Content-Type: application/json" \
+-H "Accept: Application/vnd.pterodactyl.v1+json" \
+-d '{"root_admin": true}' >/dev/null
+
+echo "Admin enabled"
 
 for i in {1..10}
 do
 
-ALLOC_ID=$(mysql -u root -D panel -e "SELECT id FROM allocations WHERE server_id IS NULL LIMIT 1;" -s -N)
+curl -s -L -X POST "$PANEL_URL/api/application/servers" \
+-H "Authorization: Bearer $API_KEY" \
+-H "Content-Type: application/json" \
+-H "Accept: Application/vnd.pterodactyl.v1+json" \
+-d "{
+'name': 'auto-$USERNAME-$i',
+'user': $USER_ID,
+'egg': 1,
+'docker_image': 'ghcr.io/pterodactyl/yolks:nodejs_18',
+'startup': 'npm start',
+'environment': {},
+'limits': {
+'memory': 0,
+'swap': 0,
+'disk': 0,
+'io': 500,
+'cpu': 0
+},
+'feature_limits': {
+'databases': 0,
+'allocations': 1,
+'backups': 0
+},
+'allocation': {
+'default': 206
+}
+}" >/dev/null
 
-if [ -z "$ALLOC_ID" ]; then
-echo "No free allocations left!"
-break
-fi
-
-php artisan p:server:create \
---name="auto-$USERNAME-$i" \
---user=$USER_ID \
---egg=$EGG_ID \
---nest=$NEST_ID \
---node=$NODE_ID \
---allocation=$ALLOC_ID \
---memory=0 \
---disk=0 \
---cpu=0 >/dev/null
-
-echo "Server $i created (allocation $ALLOC_ID)"
+echo "Server $i created"
 
 done
 
@@ -58,4 +71,5 @@ echo "-------------------------"
 
 done
 
+echo ""
 echo "All users processed."

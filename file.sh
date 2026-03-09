@@ -1,54 +1,72 @@
 #!/bin/bash
 
-echo "Pterodactyl Batch Automation"
+echo "Pterodactyl EULA Fix + Start Automation"
 
-read -p "Panel URL: " PANEL_URL
+read -p "Panel URL (e.g. https://panel.example.com): " PANEL_URL
 read -p "Application API Key: " API_KEY
+
+VOLUME_BASE="/var/lib/pterodactyl/volumes"
 
 apt install jq -y >/dev/null 2>&1
 
-echo ""
-echo "Fetching servers..."
+PAGE=1
 
-SERVERS=$(curl -s "$PANEL_URL/api/application/servers" \
--H "Authorization: Bearer $API_KEY" \
--H "Accept: Application/vnd.pterodactyl.v1+json")
+while true; do
 
-echo "$SERVERS" | jq -c '.data[]' | while read server
+RESPONSE=$(curl -s "$PANEL_URL/api/application/servers?page=$PAGE" \
+ -H "Authorization: Bearer $API_KEY" \
+ -H "Accept: Application/vnd.pterodactyl.v1+json")
+
+COUNT=$(echo "$RESPONSE" | jq '.data | length')
+
+[ "$COUNT" = "0" ] && break
+
+echo "$RESPONSE" | jq -c '.data[]' | while read server
 do
 
-UUID=$(echo "$server" | jq -r '.attributes.uuidShort')
+UUID=$(echo "$server" | jq -r '.attributes.uuid')
+UUID_SHORT=$(echo "$server" | jq -r '.attributes.uuidShort')
 NAME=$(echo "$server" | jq -r '.attributes.name')
 
-DIR="/var/lib/pterodactyl/volumes/$UUID"
+DIR="$VOLUME_BASE/$UUID"
+
+# fallback if full uuid folder not found
+if [ ! -d "$DIR" ]; then
+DIR="$VOLUME_BASE/$UUID_SHORT"
+fi
 
 echo ""
 echo "Server: $NAME"
-echo "Folder: $DIR"
+echo "UUID: $UUID_SHORT"
+echo "Path: $DIR"
 
 if [ -d "$DIR" ]; then
 
-echo "Creating eula.txt..."
+echo "Writing eula.txt..."
 echo "eula=true" > "$DIR/eula.txt"
 
 echo "Starting server..."
 
-curl -s -X POST "$PANEL_URL/api/client/servers/$UUID/power" \
--H "Authorization: Bearer $API_KEY" \
--H "Content-Type: application/json" \
--d '{"signal":"start"}' >/dev/null
+RESULT=$(curl -s -X POST "$PANEL_URL/api/client/servers/$UUID_SHORT/power" \
+ -H "Authorization: Bearer $API_KEY" \
+ -H "Content-Type: application/json" \
+ -d '{"signal":"start"}')
 
-echo "Server started"
+echo "Start signal sent"
 
 else
 
-echo "Directory still not found"
+echo "Server folder not found on this node"
 
 fi
 
-echo "-------------------------"
+echo "----------------------------"
+
+done
+
+PAGE=$((PAGE+1))
 
 done
 
 echo ""
-echo "All servers processed."
+echo "Finished processing all servers."

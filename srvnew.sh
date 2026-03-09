@@ -20,7 +20,7 @@ echo "$NODES"
 NEST_ID=1
 EGG_ID=5
 
-PAGE=1
+PAGE=10
 
 while true
 do
@@ -110,7 +110,7 @@ echo "----------------------"
 
 done
 
-PAGE=$((PAGE+1))
+PAGE=$((PAGE+10))
 
 done
 

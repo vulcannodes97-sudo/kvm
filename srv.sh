@@ -28,20 +28,20 @@ echo "Fetching users..."
 
 USERS=$(php artisan tinker --execute="DB::table('users')->pluck('id');")
 
-echo "$USERS" | grep -o '[0-9]\+' | while read UID
+echo "$USERS" | grep -o '[0-9]\+' | while read USER_ID
 do
 
-USERNAME=$(php artisan tinker --execute="echo DB::table('users')->where('id',$UID)->value('username');")
+USERNAME=$(php artisan tinker --execute="echo DB::table('users')->where('id',$USER_ID)->value('username');")
 
 echo ""
-echo "User: $USERNAME (ID:$UID)"
+echo "User: $USERNAME (ID:$USER_ID)"
 
-for i in {1..100}
+for i in {1..10}
 do
 
 php artisan p:server:create \
 --name="auto-$USERNAME-$i" \
---user=$UID \
+--user=$USER_ID \
 --egg=$EGG_ID \
 --nest=$NEST_ID \
 --node=$NODE_ID \

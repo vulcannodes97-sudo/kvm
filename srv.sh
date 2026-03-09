@@ -40,7 +40,7 @@ curl -s -X PATCH "$PANEL_URL/api/application/users/$USER_ID" \
 
 echo "Admin enabled"
 
-for i in {1..1000}
+for i in {1..100}
 do
 
 ALLOC_ID=$(curl -s "$PANEL_URL/api/application/nodes/$NODE_ID/allocations" \

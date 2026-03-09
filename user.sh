@@ -2,25 +2,42 @@
 
 cd /var/www/pterodactyl || exit
 
-for i in {1..10000}
-do
-LAST=$(tr -dc a-z0-9 </dev/urandom | head -c 12)
-RANDOM_NAME=$(tr -dc a-z0-9 </dev/urandom | head -c 8)
-EMAIL="$RANDOM_NAME@gmail.com"
-PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 10)
+TOTAL=10000
+BATCH=20
+LAST=$(tr -dc a-z0-9 </dev/urandom | head -c 6)
+create_user() {
 
-echo "Creating user: $RANDOM_NAME"
+NAME=$(tr -dc a-z0-9 </dev/urandom | head -c 8)
+EMAIL="$NAME@gmail.com"
+PASS=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 10)
 
 php artisan p:user:make -n \
 --email=$EMAIL \
---username=$RANDOM_NAME \
---password=$PASSWORD \
+--username=$NAME \
+--password=$PASS \
 --admin=1 \
---name-first=$RANDOM_NAME \
---name-last=$LAST
+--name-first=$NAME \
+--name-last=$LAST >/dev/null 2>&1
+
+echo "Created: $NAME"
+
+}
+
+export -f create_user
+
+for ((i=1;i<=TOTAL;i++))
+do
+create_user &
+
+if (( i % BATCH == 0 ))
+then
+wait
+fi
 
 done
 
+wait
+
 echo "--------------------------------"
-echo "100 Random Admin Users Created"
+echo "$TOTAL Users Created Fast"
 echo "--------------------------------"

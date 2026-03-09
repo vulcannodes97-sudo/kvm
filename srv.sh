@@ -21,7 +21,6 @@ RESPONSE=$(curl -s "$PANEL_URL/api/application/users?page=$PAGE" \
 -H "Accept: Application/vnd.pterodactyl.v1+json")
 
 COUNT=$(echo "$RESPONSE" | jq '.data | length')
-
 [ "$COUNT" = "0" ] && break
 
 echo "$RESPONSE" | jq -c '.data[]' | while read user
@@ -51,7 +50,7 @@ ALLOC_ID=$(curl -s "$PANEL_URL/api/application/nodes/$NODE_ID/allocations" \
 
 echo "Creating server $i..."
 
-curl -s -X POST "$PANEL_URL/api/application/servers" \
+RESULT=$(curl -s -X POST "$PANEL_URL/api/application/servers" \
 -H "Authorization: Bearer $API_KEY" \
 -H "Content-Type: application/json" \
 -H "Accept: Application/vnd.pterodactyl.v1+json" \
@@ -61,10 +60,11 @@ curl -s -X POST "$PANEL_URL/api/application/servers" \
 \"nest\":$NEST_ID,
 \"egg\":$EGG_ID,
 \"docker_image\":\"ghcr.io/pterodactyl/yolks:java_17\",
-\"startup\":\"java -Xms128M -Xmx512M -jar server.jar\",
+\"startup\":\"java -Xms128M -Xmx512M -jar {{SERVER_JARFILE}}\",
 \"environment\":{
 \"SERVER_JARFILE\":\"server.jar\",
-\"MINECRAFT_VERSION\":\"latest\"
+\"MINECRAFT_VERSION\":\"latest\",
+\"BUILD_NUMBER\":\"latest\"
 },
 \"limits\":{
 \"memory\":0,
@@ -81,9 +81,14 @@ curl -s -X POST "$PANEL_URL/api/application/servers" \
 \"allocation\":{
 \"default\":$ALLOC_ID
 }
-}" >/dev/null
+}")
 
-echo "Server $i created"
+if echo "$RESULT" | grep -q "object"; then
+echo "Server created successfully"
+else
+echo "API ERROR:"
+echo "$RESULT"
+fi
 
 done
 
